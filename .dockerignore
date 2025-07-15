@@ -1,0 +1,18 @@
+# Docker ignore file for .NET projects
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/node_modules/
+**/npm-debug.log
+**/.git/
+**/.gitignore
+**/README.md
+**/Dockerfile
+**/.dockerignore
+**/docker-compose*.yml
+**/*.md
+**/.env
+**/secrets.json
+**/.DS_Store
+**/Thumbs.db

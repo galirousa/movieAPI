@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: moviedb-postgres
+    environment:
+      POSTGRES_USER: movieuser
+      POSTGRES_PASSWORD: moviepass
+      POSTGRES_DB: MovieDB
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    networks:
+      - movieapi-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U movieuser -d MovieDB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  movieapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: movieapi-container
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__MovieDatabase=Server=postgres;Port=5432;Database=MovieDB;User Id=movieuser;Password=moviepass;
+    volumes:
+      # Optional: Mount appsettings for configuration changes without rebuild
+      - ./movieapi/appsettings.json:/app/appsettings.json:ro
+      - ./movieapi/appsettings.Development.json:/app/appsettings.Development.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - movieapi-network
+
+volumes:
+  postgres_data:
+
+networks:
+  movieapi-network:
+    driver: bridge

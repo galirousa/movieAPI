@@ -12,7 +12,7 @@ namespace movieapi.Services
 {
     public interface IMovieService
     {
-        Task<List<Movie>> SearchMoviesAsync(string query);
+        Task<Response> SearchMoviesAsync(string query);
     }
 
     public class MovieService : IMovieService
@@ -32,7 +32,7 @@ namespace movieapi.Services
             _logger = logger;
         }
 
-        public async Task<List<Movie>> SearchMoviesAsync(string query)
+        public async Task<Response> SearchMoviesAsync(string query)
         {
             try
             {
@@ -46,12 +46,12 @@ namespace movieapi.Services
                     if (similar == null || !similar.Any())
                     {
                         _logger.LogWarning($"No se encontraron películas similares para: {cachedMovie.TmdbId}");
-                        return new List<Movie> { cachedMovie };
+                        return new Response { Movie = cachedMovie };
                     }
 
-                    var cachedResult = new List<Movie> { cachedMovie };
-                    cachedResult.AddRange(similar);
-                    return cachedResult;
+                    var similarToCached = new List<string>();
+                    similarToCached.AddRange(similar);
+                    return new Response { Movie = cachedMovie, SimilarMovies = similarToCached };
                 }
 
                 // Si no hay películas en caché o están desactualizadas, hacer petición a la API
@@ -70,7 +70,7 @@ namespace movieapi.Services
                 response.EnsureSuccessStatusCode();
                 var body = await response.Content.ReadFromJsonAsync<MovieResponse>();
 
-                if (body?.Results == null) return new List<Movie>();
+                if (body?.Results == null) return new Response();
 
                 // Guardar película en la base de datos
                 var savedMovie = await SaveOrUpdateMovieAsync(body.Results.FirstOrDefault()!);
@@ -82,11 +82,10 @@ namespace movieapi.Services
                 if (similarMovies == null || !similarMovies.Any())
                 {
                     _logger.LogWarning($"No se encontraron películas similares para: {savedMovie.TmdbId}");
-                    return result;
+                    return new Response { Movie = savedMovie };
                 }
 
-                result.AddRange(similarMovies);
-                return result;
+                return new Response { Movie = savedMovie, SimilarMovies = similarMovies };
             }
             catch (Exception ex)
             {
@@ -95,7 +94,7 @@ namespace movieapi.Services
             }
         }
 
-        private async Task<List<Movie>> SearchSimilarMovies(string movieId)
+        private async Task<List<string>> SearchSimilarMovies(string movieId)
         {
             try
             {
@@ -114,14 +113,14 @@ namespace movieapi.Services
                 response.EnsureSuccessStatusCode();
                 var body = await response.Content.ReadFromJsonAsync<MovieResponse>();
 
-                if (body?.Results == null) return new List<Movie>();
+                if (body?.Results == null) return new List<string>();
 
                 // Guardar película en la base de datos
-                var similarMovies = new List<Movie>();
-                foreach (var movie in body.Results.Take(4)) // Limitar a 4 resultado
+                var similarMovies = new List<string>();
+                foreach (var movie in body.Results.Take(5)) // Limitar a 5 resultados
                 {
                     var savedMovie = await SaveOrUpdateMovieAsync(movie);
-                    similarMovies.Add(savedMovie);
+                    similarMovies.Add(savedMovie.Title + " (" + savedMovie.ReleaseDate?.Year + ")");
                 }
 
                 _logger.LogInformation($"Se obtuvieron {similarMovies.Count} películas similares");
